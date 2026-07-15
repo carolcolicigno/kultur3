@@ -1,0 +1,14 @@
+{
+  "name": "Kultur3",
+  "description": "Plataforma de inteligência cultural. Mapeamento de tendências, insights e criatividade baseada em dados reais.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "AI-powered trend mapping",
+    "Real-time cultural insights",
+    "Automated creative briefings"
+  ]
+}

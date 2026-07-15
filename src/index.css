@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+@theme {
+  --font-syne: "Syne", sans-serif;
+  --font-mono: "Space Mono", monospace;
+  --font-sans: "DM Sans", sans-serif;
+
+  --color-bg: #070707;
+  --color-bg2: #0C0C0C;
+  --color-bg3: #111111;
+  --color-card: #141414;
+  --color-card2: #181818;
+  --color-border: #1F1F1F;
+  --color-border2: #2A2A2A;
+  --color-border3: #363636;
+  --color-text: #EEEEEE;
+  --color-ink: #EEEEEE;
+  --color-muted: #666666;
+  --color-dim: #999999;
+  --color-faint: #2A2A2A;
+  
+  --color-accent: #FF2D78;
+  --color-pink: #FF2D78;
+  --color-pink2: #FF0060;
+  --color-lime: #CCFF00;
+  --color-cyan: #00EEFF;
+  --color-amber: #FFB800;
+  --color-red: #FF3D3D;
+  --color-green: #3DFF8A;
+
+  --color-pd: rgba(255, 45, 120, 0.1);
+  --color-pb: rgba(255, 45, 120, 0.2);
+  --color-ld: rgba(204, 255, 0, 0.08);
+}
+
+@layer base {
+  body {
+    @apply bg-bg text-text font-sans antialiased;
+    font-size: 13px;
+    height: 100vh;
+    overflow: hidden;
+  }
+}
+
+@layer utilities {
+  .logo-box {
+    clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+  }
+
+  .sp-btn-main {
+    clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  }
+
+  .run-btn {
+    clip-path: polygon(0 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 7px 100%, 0 calc(100% - 7px));
+  }
+
+  .bsend {
+    clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 5px, 100% 100%, 5px 100%, 0 calc(100% - 5px));
+  }
+}
+
+@keyframes scan {
+  0% { top: -2px; opacity: 0; }
+  5% { opacity: 1; }
+  95% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+@keyframes mq {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
