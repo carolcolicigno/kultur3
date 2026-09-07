@@ -9,7 +9,8 @@ import { sections, type Edition } from '../shared/curation';
 const equal = (a: string, b: string) => { const x = Buffer.from(a); const y = Buffer.from(b); return x.length === y.length && timingSafeEqual(x, y); };
 export function createApp(options: { production?: boolean; password?: string; dataDir?: string; researcher?: typeof research } = {}) {
   const production = options.production ?? process.env.NODE_ENV === 'production';
-  const password = options.password ?? process.env.PILOT_PASSWORD;
+  const localAuth = process.env.PILOT_AUTH_LOCAL === 'true';
+  const password = options.password ?? (production || localAuth ? process.env.PILOT_PASSWORD : undefined);
   if (production && (!password || password.length < 16)) throw new Error('Configure PILOT_PASSWORD com pelo menos 16 caracteres antes de publicar o piloto.');
   const app = express();
   const dir = options.dataDir || process.env.DATA_DIR || '.data';

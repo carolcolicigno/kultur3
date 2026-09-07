@@ -32,6 +32,7 @@ Abra `http://localhost:3000`.
 - `GEMINI_MODEL`: modelo usado para respostas estruturadas em JSON.
 - `GEMINI_TEXT_MODEL`: modelo usado para respostas textuais.
 - `PILOT_PASSWORD`: senha compartilhada do piloto. Em producao ela e obrigatoria e precisa ter pelo menos 16 caracteres. Usuario: `kultur3`.
+- `PILOT_AUTH_LOCAL`: use `true` apenas se quiser exigir a senha tambem em desenvolvimento local.
 - `DATA_DIR`: pasta persistente para historico de pesquisas e curadorias.
 
 ## Garantias desta versao
