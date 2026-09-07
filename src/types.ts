@@ -44,6 +44,7 @@ export interface Trend {
 }
 
 export interface DailyBriefing {
+  _research?: import('../shared/research').ResearchEvidence;
   urgencia_geral: string;
   resumo_dia: string;
   nota_do_curador: string;

@@ -31,10 +31,12 @@ import {
   Zap,
   Bell
 } from 'lucide-react';
-import { Type } from '@google/genai';
+import { CurationPanel } from './components/CurationPanel';
+import { ResearchSources } from './components/ResearchSources';
+import type { ResearchEvidence } from '../shared/research';
 import Markdown from 'react-markdown';
 import { PanelType, BrandConfig, DailyBriefing, ReportItem, Activation, FuseState } from './types';
-import { generateContent, generateJSON, SCHEMAS } from './services/geminiService';
+import { generateTextResearch, generateJSON, SCHEMAS, Type } from './services/geminiService';
 
 // --- Shared Components ---
 
@@ -124,7 +126,7 @@ const Card = ({ children, className = '', title, badge, loading = false, statusT
           <div className="min-h-[160px] flex flex-col items-center justify-center gap-[12px]">
             <div className="w-[26px] h-[26px] border-2 border-border2 border-t-accent rounded-full animate-spin" />
             <div className="font-mono text-[10px] text-muted tracking-[1.5px] text-center max-w-[300px]">
-              {statusText || "Pesquisando fontes verificadas..."}
+              {statusText || "Pesquisando referencias..."}
             </div>
           </div>
         ) : children}
@@ -173,26 +175,6 @@ const NavButton = ({ active, onClick, icon, children }: any) => (
 // --- Splash Component ---
 
 const Splash = ({ onEnter }: { onEnter: () => void }) => {
-  const [counts, setCounts] = useState({ tr: 0, fo: 0, op: 0, mk: 0 });
-  const targets = { tr: 47, fo: 25, op: 12, mk: 120 };
-
-  useEffect(() => {
-    const duration = 1800;
-    const start = Date.now();
-    const tick = () => {
-      const p = Math.min((Date.now() - start) / duration, 1);
-      const e = 1 - Math.pow(1 - p, 3);
-      setCounts({
-        tr: Math.round(e * targets.tr),
-        fo: Math.round(e * targets.fo),
-        op: Math.round(e * targets.op),
-        mk: Math.round(e * targets.mk),
-      });
-      if (p < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, []);
-
   return (
     <motion.div 
       initial={{ opacity: 1 }}
@@ -208,11 +190,11 @@ const Splash = ({ onEnter }: { onEnter: () => void }) => {
             <React.Fragment key={i}>
               <div className="flex items-center gap-[14px] px-[28px] font-mono text-[9px] tracking-[2.5px] uppercase whitespace-nowrap text-black/70">
                 <div className="w-[3px] h-[3px] rotate-45 bg-black/50 shrink-0" />
-                Inteligência Cultural em Tempo Real
+                Inteligência para marcas e comunicação
                 <div className="w-[3px] h-[3px] rotate-45 bg-black/50 shrink-0" />
                 Trends · Creators · Oportunidades
                 <div className="w-[3px] h-[3px] rotate-45 bg-black/50 shrink-0" />
-                Dados verificados com fonte e data
+                Pesquisa com referências para conferência
               </div>
             </React.Fragment>
           ))}
@@ -262,26 +244,6 @@ const Splash = ({ onEnter }: { onEnter: () => void }) => {
               Como funciona
             </button>
           </motion.div>
-          <motion.div 
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-            className="flex border-t border-border mt-[40px]"
-          >
-            {[
-              { label: 'Trends hoje', val: counts.tr },
-              { label: 'Fontes', val: counts.fo },
-              { label: 'Oportunidades', val: counts.op },
-              { label: 'Marcas', val: counts.mk }
-            ].map((s, i) => (
-              <div key={i} className="flex-1 py-[16px] border-r last:border-r-0 border-border">
-                <div className="font-syne font-extrabold text-[28px] tracking-[-1.5px] text-white leading-none">
-                  <span className="text-accent">{s.val}</span>
-                </div>
-                <div className="font-mono text-[8px] tracking-[1px] uppercase text-muted mt-[3px]">{s.label}</div>
-              </div>
-            ))}
-          </motion.div>
         </div>
         <div className="flex flex-col overflow-y-auto">
            <div className="p-[24px_26px] border-b border-border">
@@ -290,8 +252,8 @@ const Splash = ({ onEnter }: { onEnter: () => void }) => {
               Como funciona
             </div>
              {[
-               { n: '01', t: 'Pesquisamos em tempo real', d: '30+ fontes: Meio & Mensagem, B9, Propmark, AdNews, TikTok, X, Google Trends, UOL...' },
-               { n: '02', t: 'A IA analisa e estrutura', d: 'Score de intensidade, urgência, plataformas ativas, creators e oportunidade.' },
+               { n: '01', t: 'Pesquisamos sob demanda', d: 'Publicações de publicidade, comunicação, marcas e creator economy, com referências retornadas pela busca.' },
+               { n: '02', t: 'A IA analisa e estrutura', d: 'Contexto, referências e oportunidades editoriais para a sua marca.' },
                { n: '03', t: 'Seu time ativa com velocidade', d: 'One-Page pronto para apresentar. Report com teaser para WhatsApp. Do insight à ação em minutos.' }
              ].map((s, i) => (
                <div key={i} className="flex gap-[12px] py-[10px] border-b last:border-b-0 border-border">
@@ -304,35 +266,18 @@ const Splash = ({ onEnter }: { onEnter: () => void }) => {
              ))}
            </div>
            
-           <div className="p-[24px_26px] border-b border-border">
-             <div className="font-mono text-[8px] tracking-[2px] uppercase text-accent mb-[14px] flex items-center gap-[8px]">
-                <div className="w-[12px] h-[1px] bg-accent" />
-                Resultados reais
-             </div>
-             {[
-               { b: 'Amstel · Heineken Brasil', n: '+526%', d: 'Impressões médias em Stories — trend ativada 48h antes do pico' },
-               { b: 'Max · Warner Bros. Discovery', n: '+13 p.p.', d: 'Taxa de engajamento no TikTok fora de temporada' }
-             ].map((c, i) => (
-               <div key={i} className="bg-card border border-border p-[12px] mb-[6px] relative overflow-hidden before:content-[''] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[2px] before:bg-accent">
-                 <div className="font-mono text-[8px] tracking-[1.5px] uppercase text-accent mb-[3px]">{c.b}</div>
-                 <div className="font-syne text-[22px] font-extrabold text-white tracking-[-1px] leading-none mb-[2px]">{c.n}</div>
-                 <div className="text-[10px] text-muted leading-relaxed">{c.d}</div>
-               </div>
-             ))}
-           </div>
-
            <div className="mt-auto p-[16px_26px] bg-bg2 border-t border-border">
              <div className="font-mono text-[8px] tracking-[2px] uppercase text-muted mb-[10px] flex items-center gap-[6px]">
                <div className="w-[6px] h-[6px] rounded-full bg-accent animate-pulse" />
                Agora na plataforma
              </div>
              <div className="flex justify-between py-[5px] border-b border-border text-[11px]">
-               <span className="text-muted text-[11px]">Última atualização</span>
-               <span className="font-mono text-lime text-[10px]">Agosto 2026</span>
+               <span className="text-muted text-[11px]">Modo de pesquisa</span>
+               <span className="font-mono text-lime text-[10px]">Sob demanda</span>
              </div>
              <div className="flex justify-between py-[5px] border-b last:border-b-0 border-border text-[11px]">
-               <span className="text-muted text-[11px]">Urgência do dia</span>
-               <span className="font-mono text-accent text-[10px]">ALTA</span>
+               <span className="text-muted text-[11px]">Conferência editorial</span>
+               <span className="font-mono text-accent text-[10px]">Necessária</span>
              </div>
            </div>
         </div>
@@ -369,14 +314,7 @@ const Splash = ({ onEnter }: { onEnter: () => void }) => {
 };
 
 
-const defaultEvents = () => {
-  const y = new Date().getFullYear();
-  return [
-    {date:`${y}-03-20`,name:'Lollapalooza 2026',desc:'Festival de música em São Paulo — 3 dias de ativação intensa.',opp:'Bebidas, moda, tech, entretenimento',type:'p',tags:['Música','SP']},
-    {date:`${y}-03-17`,name:'Lei Felca em vigor',desc:'Novas regras para menores na internet entram em vigor.',opp:'Tech, games, plataformas digitais',type:'c',tags:['Legislação','Digital']},
-    {date:`${y}-05-11`,name:'Dia das Mães',desc:'Uma das datas de maior volume de conversas.',opp:'Todas as categorias',type:'p',tags:['Comercial']}
-  ];
-};
+const defaultEvents = () => [];
 // --- Panels ---
 
 const InsightsPanel = ({ config, onError }: { config: BrandConfig, onError: (e: any) => void }) => {
@@ -385,11 +323,13 @@ const InsightsPanel = ({ config, onError }: { config: BrandConfig, onError: (e: 
   const [deep, setDeep] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+  const [evidence, setEvidence] = useState<ResearchEvidence>();
 
   const handleAnalyze = async () => {
     if (!topic.trim()) return;
     setLoading(true);
     setResult(null);
+    setEvidence(undefined);
 
     try {
       const system = `Você é especialista sênior em inteligência cultural e marketing de marca para o mercado brasileiro. 
@@ -399,8 +339,9 @@ Responda de forma estratégica, profunda e provocativa. Use Markdown. MARCA ATIV
 Busque em: meioemensagem.com.br, b9.com.br, x.com/explore, tiktok.com/trending, trends.google.com.br, propmark.com.br, adnews.com.br, updateordie.com, uol.com.br.
 Retorne: 1. Mapa de Calor Cultural (Sinais Fortes/Fracos), 2. Comportamentos Emergentes, 3. Tensões & Territórios de Marca, 4. 3 Ideias Prontas para Ativação.`;
       
-      const res = await generateContent(system, prompt);
-      setResult(res);
+      const res = await generateTextResearch(system, prompt);
+      setResult(res.text);
+      setEvidence(res.research);
     } catch (e) {
       setResult("Falha na varredura profunda. Tente novamente.");
       onError(e);
@@ -456,7 +397,7 @@ Retorne: 1. Mapa de Calor Cultural (Sinais Fortes/Fracos), 2. Comportamentos Eme
           </div>
 
           {loading ? (
-            <Card loading={true} statusText={deep ? "Scanner Neural em nível profundo (3 rodadas)..." : "Pesquisando em fontes verificadas..."} />
+            <Card loading={true} statusText={deep ? "Scanner Neural em nível profundo (3 rodadas)..." : "Pesquisando referencias..."} />
           ) : result ? (
             <div className="animate-[fade_0.4s_ease]">
               <Card title="Blueprint de Insight">
@@ -468,6 +409,7 @@ Retorne: 1. Mapa de Calor Cultural (Sinais Fortes/Fracos), 2. Comportamentos Eme
                   [&_strong]:text-white [&_strong]:font-bold
                   [&_ul]:mb-8 [&_ul]:list-none [&_ul_li]:before:content-['→'] [&_ul_li]:before:text-accent [&_ul_li]:before:mr-3 [&_ul_li]:before:font-bold">
                   <Markdown>{result}</Markdown>
+                  <ResearchSources evidence={evidence} />
                 </div>
               </Card>
             </div>
@@ -489,6 +431,7 @@ const TrendsPanel = ({ config, onError, onSignal }: { config: BrandConfig, onErr
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState("Iniciando varredura...");
   const [trends, setTrends] = useState<any[]>([]);
+  const [evidence, setEvidence] = useState<ResearchEvidence>();
 
   const handleMap = async () => {
     setLoading(true);
@@ -503,6 +446,7 @@ Identifique 6 sinais fortes que impactam o marketing e a estratégia de marca ho
       const res = await generateJSON(system, prompt, SCHEMAS.TRENDS, (msg) => setStatus(msg));
       const trendList = res?.trends || [];
       setTrends(trendList);
+      setEvidence(res._research);
 
       // Check for critical signals
       const critical = trendList.find((t: any) => t.urgency === 'CRITICAL');
@@ -530,7 +474,7 @@ Identifique 6 sinais fortes que impactam o marketing e a estratégia de marca ho
           <span className="text-accent underline decoration-[6px] underline-offset-[10px]">RADAR</span>
         </h1>
         <p className="text-[14px] text-muted max-w-[480px] leading-relaxed font-light uppercase tracking-tight">
-          Sinais em tempo real captados em clusters sociais e media nodes.
+          Campanhas, marcas e movimentos culturais pesquisados sob demanda.
         </p>
       </div>
 
@@ -576,7 +520,7 @@ Identifique 6 sinais fortes que impactam o marketing e a estratégia de marca ho
                     <span className={`font-mono text-[9px] px-[10px] py-[4px] tracking-[2px] uppercase font-black border ${t.badge === 'HOT' ? 'bg-accent border-accent text-white' : 'bg-transparent border-white/20 text-white/50'}`}>
                       {t.badge}
                     </span>
-                    <span className="font-mono text-[10px] text-accent font-black tracking-[1px]">{t.score}/100</span>
+                    <span className="font-mono text-[10px] text-accent font-black tracking-[1px]">Avaliação editorial</span>
                   </div>
                   <div className="font-syne font-extrabold text-[22px] text-white mb-[8px] leading-none uppercase tracking-tight">{t.title}</div>
                   <div className="text-[13px] text-muted leading-relaxed mb-5 font-light">{t.description}</div>
@@ -591,7 +535,7 @@ Identifique 6 sinais fortes que impactam o marketing e a estratégia de marca ho
                   <div className="mt-[24px] h-[2px] bg-white/[0.05] overflow-hidden">
                     <motion.div 
                       initial={{ width: 0 }}
-                      animate={{ width: `${t.score}%` }}
+                      animate={{ width: 0 }}
                       transition={{ duration: 1, ease: "easeOut" }}
                       className="h-full bg-accent" 
                     />
@@ -601,6 +545,7 @@ Identifique 6 sinais fortes que impactam o marketing e a estratégia de marca ho
             </div>
           )}
           
+          <ResearchSources evidence={evidence} />
           {!loading && trends.length === 0 && (
             <div className="py-[120px] text-center opacity-30">
                <Radar size={48} className="mx-auto mb-4 text-accent" />
@@ -727,6 +672,7 @@ Sua tarefa é criar One-Pagers impactantes, ousados e estrategicamente perfeitos
                     <OnePageSection title="Action Plan / Próximos Passos" list={data.next_steps} />
                  </div>
                </div>
+               <ResearchSources evidence={data._research} />
                {data.risk && (
                   <div className="p-[16px_32px] bg-accent/5 border-t border-border/50 text-[11px] text-accent font-bold uppercase tracking-widest">
                      ⚠ Risk Factor: {data.risk}
@@ -775,6 +721,7 @@ const RivalsPanel = ({ config, onError }: { config: BrandConfig, onError: (e: an
     setRivals(rivals.filter((_, i) => i !== index));
   };
 
+  const [evidence, setEvidence] = useState<ResearchEvidence>();
   const handleAnalyze = async () => {
     if (!rivals.length) return;
     setLoading(true);
@@ -784,6 +731,7 @@ const RivalsPanel = ({ config, onError }: { config: BrandConfig, onError: (e: an
       
       const res = await generateJSON(system, prompt, SCHEMAS.RIVALS);
       setData(res.rivals || []);
+      setEvidence(res._research);
     } catch (e) {
       console.error(e);
       onError(e);
@@ -827,8 +775,9 @@ const RivalsPanel = ({ config, onError }: { config: BrandConfig, onError: (e: an
              <Button variant="main" onClick={handleAnalyze} disabled={loading || !rivals.length}>Disparar Análise</Button>
           </div>
 
+          <ResearchSources evidence={evidence} />
           {loading ? (
-            <Card loading={true} statusText="Consultando sinais de mercado em tempo real..." />
+            <Card loading={true} statusText="Pesquisando publicações recentes..." />
           ) : (
             <div className="grid grid-cols-1 gap-[12px]">
               {data.some(r => r.alert) && (
@@ -870,7 +819,7 @@ const RivalsPanel = ({ config, onError }: { config: BrandConfig, onError: (e: an
                       <div className="font-syne text-[22px] font-extrabold text-white tracking-tight uppercase">{r.name}</div>
                       <div className="flex items-center gap-[10px]">
                          {r.platform && <div className="font-mono text-[9px] px-[10px] py-[4px] bg-accent text-white font-black tracking-[1.5px] uppercase">{r.platform}</div>}
-                         <div className="font-mono text-[10px] text-muted font-bold">{r.score}/100</div>
+                         <div className="font-mono text-[10px] text-muted font-bold">Análise editorial</div>
                       </div>
                    </div>
                    <div className="space-y-3">
@@ -911,6 +860,7 @@ const RivalsPanel = ({ config, onError }: { config: BrandConfig, onError: (e: an
 const CalendarPanel = ({ onError }: { onError: (e: any) => void }) => {
   const [month, setMonth] = useState(new Date().getMonth());
   const [year, setYear] = useState(new Date().getFullYear());
+  const [evidence, setEvidence] = useState<ResearchEvidence>();
   const [events, setEvents] = useState<any[]>(defaultEvents());
   const [loading, setLoading] = useState(false);
 
@@ -932,6 +882,8 @@ const CalendarPanel = ({ onError }: { onError: (e: any) => void }) => {
             items: {
               type: Type.OBJECT,
               properties: {
+                source_url: { type: Type.STRING },
+                source_name: { type: Type.STRING },
                 date: { type: Type.STRING },
                 name: { type: Type.STRING },
                 desc: { type: Type.STRING },
@@ -943,6 +895,7 @@ const CalendarPanel = ({ onError }: { onError: (e: any) => void }) => {
           }
         }
       });
+      setEvidence(res._research);
       if (res.events) {
         setEvents([...events, ...res.events.filter((e: any) => !events.find(ex => ex.date === e.date && ex.name === e.name))]);
       }
@@ -1051,150 +1004,11 @@ const CalendarPanel = ({ onError }: { onError: (e: any) => void }) => {
                       <div className="font-mono text-[9px] text-accent font-bold border border-accent/30 px-2 py-1 uppercase">{new Date(e.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</div>
                     </div>
                     <div className="text-[13px] text-muted leading-relaxed font-light">{e.desc}</div>
+                    {e.source_url && <a className="text-sm text-accent underline" href={e.source_url} target="_blank" rel="noopener noreferrer">Conferir fonte e data</a>}
                  </Card>
                ))}
              </div>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// --- Report Panel ---
-
-const ReportPanel = ({ config, onError }: { config: BrandConfig, onError: (e: any) => void }) => {
-  const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<any>(null);
-  const [teaser, setTeaser] = useState('');
-  const [activeTab, setActiveTab] = useState<'teaser' | 'report'>('teaser');
-
-  const handleGenerate = async () => {
-    setLoading(true);
-    try {
-      const today = new Date().toLocaleDateString('pt-BR');
-      const system = `Analista cultural sênior da Kultur3. Retorne inteligência de elite. Escreva os textos em formato misto (não apenas caixa alta).`;
-      const prompt = `Gere um report cultural completo para hoje (${today}). Foco: cultura pop, tendências digitais e comportamento no Brasil. Busque em: Meio & Mensagem, B9, Propmark, AdNews, G1, UOL. MARCA ATIVA: ${config.brand}. Segmento: ${config.seg}.`;
-      
-      const res = await generateJSON(system, prompt, SCHEMAS.REPORT);
-      setData(res);
-      
-      const teaserPrompt = `Crie um teaser impactante e "vibration" para WhatsApp com base neste report cultural brasileiro: ${JSON.stringify(res).slice(0, 1000)}. Use emojis com moderação, seja direto e provocativo.`;
-      const teaserRes = await generateContent("Copywriter sênior especializado em canais de broadcast.", teaserPrompt);
-      setTeaser(teaserRes);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-full overflow-hidden">
-      <div className="p-[48px_32px_32px] border-b border-border bg-bg shrink-0 relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle,rgba(255,255,255,0.015)_1px,transparent_1px)] bg-[size:10px_10px]" />
-        <div className="font-mono text-[9px] tracking-[4px] uppercase text-accent mb-[12px] flex items-center gap-[8px] font-black">
-          <div className="w-[18px] h-[3px] bg-accent" />
-          Neural Dispatch
-        </div>
-        <h1 className="font-syne text-[clamp(42px,6vw,72px)] font-extrabold text-white tracking-[-3px] leading-[0.9] uppercase mb-[10px]">
-          CULTURAL<br />
-          <span className="text-accent underline decoration-[6px] underline-offset-[10px]">DISPATCH</span>
-        </h1>
-        <p className="text-[14px] text-muted max-w-[480px] leading-relaxed font-light uppercase tracking-tight">
-          Relatórios executivos e teasers de impacto baseados em sinais captados nas últimas 24h.
-        </p>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-[22px_28px] bg-bg">
-        <div className="max-w-[1000px]">
-          <div className="bg-card border border-border p-[14px] mb-[32px] flex gap-[12px] items-center relative overflow-hidden group">
-            <div className="absolute top-0 left-0 right-0 h-[1px] bg-accent/20" />
-            <div className="flex-1 px-4 py-2 font-syne text-[13px] text-muted uppercase tracking-wider italic">
-              Preparado para gerar o despacho cultural de hoje para {config.brand}...
-            </div>
-            <Button variant="main" onClick={handleGenerate} disabled={loading}>✦ Gerar Despacho</Button>
-          </div>
-
-           {loading && (
-             <Card loading={true} statusText="Mapeando trends e criando report estratégico..." />
-           )}
-
-           {data && !loading && (
-            <div className="animate-[fade_0.4s_ease]">
-              <div className="flex border-b border-border mb-8">
-                <button 
-                  onClick={() => setActiveTab('teaser')}
-                  className={`px-8 py-4 font-mono text-[10px] uppercase tracking-[3px] transition-all relative ${activeTab === 'teaser' ? 'text-accent font-black' : 'text-muted hover:text-white'}`}
-                >
-                  Briefing Teaser
-                  {activeTab === 'teaser' && <motion.div layoutId="dispatch-tab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent" />}
-                </button>
-                <button 
-                  onClick={() => setActiveTab('report')}
-                  className={`px-8 py-4 font-mono text-[10px] uppercase tracking-[3px] transition-all relative ${activeTab === 'report' ? 'text-accent font-black' : 'text-muted hover:text-white'}`}
-                >
-                  Full Report
-                  {activeTab === 'report' && <motion.div layoutId="dispatch-tab" className="absolute bottom-0 left-0 right-0 h-[2px] bg-accent" />}
-                </button>
-              </div>
-
-                {activeTab === 'teaser' ? (
-                  <Card title="Briefing Express (WhatsApp)">
-                    <div className="bg-bg border border-border p-8 font-sans text-[14px] text-white whitespace-pre-wrap leading-relaxed selection:bg-accent selection:text-white">
-                      {teaser}
-                    </div>
-                    <div className="mt-6 flex justify-end gap-2">
-                       <Button onClick={() => navigator.clipboard.writeText(teaser)} className="text-[10px] px-6">Copiar para WhatsApp</Button>
-                       <button className="bg-transparent border border-white/10 text-muted px-4 py-2 font-mono text-[9px] uppercase hover:text-white hover:border-accent transition-all" onClick={handleGenerate}>↺ Regenerar</button>
-                    </div>
-                  </Card>
-                ) : (
-                <div className="flex flex-col gap-10">
-                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="bg-card border border-border p-6 flex flex-col items-center justify-center text-center">
-                         <div className="font-syne font-black text-[32px] text-white leading-none">{data.temperatura?.assuntos_total || 0}</div>
-                         <div className="font-mono text-[9px] text-accent tracking-[2px] uppercase mt-2">Assuntos Mapeados</div>
-                      </div>
-                      <div className="bg-card border border-border p-6 flex flex-col items-center justify-center text-center">
-                         <div className="font-syne font-black text-[32px] text-accent leading-none uppercase">{data.temperatura?.urgencia_geral}</div>
-                         <div className="font-mono text-[9px] text-accent tracking-[2px] uppercase mt-2">Urgência Geral</div>
-                      </div>
-                      <div className="bg-card border border-border p-6 flex flex-col items-center justify-center text-center">
-                         <div className="font-syne font-black text-[32px] text-white leading-none">{data.temperatura?.trends_total || 0}</div>
-                         <div className="font-mono text-[9px] text-accent tracking-[2px] uppercase mt-2">Active Signals</div>
-                      </div>
-                   </div>
-
-                   <Card title="Executive Insight">
-                      <p className="text-[16px] text-white font-light leading-relaxed italic whitespace-pre-wrap">{data.temperatura?.resumo_executivo}</p>
-                   </Card>
-
-                   <div className="space-y-6">
-                      <div className="font-mono text-[10px] text-accent font-black tracking-[4px] uppercase flex items-center gap-4">
-                        <div className="w-12 h-[1px] bg-accent" />
-                        Pautas Prioritárias
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {data.assuntos?.map((a: any, i: number) => (
-                           <div key={i} className="bg-card border border-border p-8 relative group hover:border-accent/40 transition-all">
-                              <div className="flex justify-between items-start mb-4">
-                                 <h4 className="font-syne font-extrabold text-[18px] text-white uppercase tracking-tight">{a.titulo}</h4>
-                                 <span className="font-mono text-[8px] bg-white text-bg px-2 py-1 font-bold">{a.urgencia}</span>
-                              </div>
-                              <p className="text-[13px] text-muted leading-relaxed font-light mb-6">{a.descricao}</p>
-                              <div className="pt-4 border-t border-white/5">
-                                 <div className="font-mono text-[9px] text-accent font-black uppercase tracking-[2px] mb-2 italic">Opportunity //</div>
-                                 <p className="text-[13px] text-white font-medium italic">{a.oportunidade}</p>
-                              </div>
-                           </div>
-                        ))}
-                      </div>
-                   </div>
-                </div>
-                )}
-             </div>
-           )}
         </div>
       </div>
     </div>
@@ -1233,14 +1047,14 @@ const AnalyticsPanel = ({ config, activations, setActivations, reports }: any) =
                 <div className="font-syne text-[32px] font-extrabold text-white">{activations.length}</div>
              </div>
              <div className="bg-card p-6">
-                <div className="font-mono text-[8px] uppercase text-muted mb-2 tracking-[2px] font-bold">Neural Score</div>
-                <div className="font-syne text-[32px] font-extrabold text-accent">98.4</div>
+                <div className="font-mono text-[8px] uppercase text-muted mb-2 tracking-[2px] font-bold">Medição de impacto</div>
+                <div className="font-syne text-[32px] font-extrabold text-accent">Não disponível</div>
              </div>
              <div className="bg-card p-6">
                 <div className="font-mono text-[8px] uppercase text-muted mb-2 tracking-[2px] font-bold">System Status</div>
                 <div className="flex items-center gap-2 mt-2">
                   <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
-                  <div className="font-mono text-[10px] font-black text-accent uppercase tracking-[1px]">Operational</div>
+                  <div className="font-mono text-[10px] font-black text-accent uppercase tracking-[1px]">Não monitorado</div>
                 </div>
              </div>
           </div>
@@ -1260,8 +1074,8 @@ const AnalyticsPanel = ({ config, activations, setActivations, reports }: any) =
                           </div>
                        </div>
                        <div className="text-right">
-                          <div className="font-syne text-[22px] font-extrabold text-accent">+{a.roi || 0}%</div>
-                          <div className="font-mono text-[8px] text-muted uppercase tracking-[1px] font-bold">ROI Estimado</div>
+                          <div className="font-syne text-[22px] font-extrabold text-accent">{a.roi == null ? 'Não medido' : `${a.roi}%`}</div>
+                          <div className="font-mono text-[8px] text-muted uppercase tracking-[1px] font-bold">ROI informado</div>
                        </div>
                     </div>
                   ))
@@ -1328,7 +1142,7 @@ const HomePanel = ({ config, setActivePanel, onError }: { config: BrandConfig, s
               <span className="text-accent underline decoration-[6px] underline-offset-[10px]">DO DIA</span>
             </h1>
             <p className="text-[14px] text-muted max-w-[480px] leading-relaxed font-light uppercase tracking-tight">
-              Sincronizando inteligência de mercado em tempo real...
+              Pesquise publicações recentes e confira as referências.
             </p>
           </div>
           <div className="flex flex-col items-end gap-[12px]">
@@ -1337,6 +1151,7 @@ const HomePanel = ({ config, setActivePanel, onError }: { config: BrandConfig, s
             </div>
             <button 
               onClick={fetchBriefing}
+              disabled={loading}
               className="bg-transparent border-0 text-muted font-mono text-[9px] tracking-[2px] uppercase hover:text-white flex items-center gap-2 transition-all"
             >
               <RefreshCw size={11} className={loading ? 'animate-spin' : ''} /> Reconectar
@@ -1353,6 +1168,7 @@ const HomePanel = ({ config, setActivePanel, onError }: { config: BrandConfig, s
             <div className="grid grid-cols-1 md:grid-cols-3 gap-[16px]">
               <div className="md:col-span-3">
                 <Card title="Resumo Estratégico">
+                  <ResearchSources evidence={data._research} />
                   <div className="text-[16px] text-white leading-relaxed font-light mb-4 whitespace-pre-wrap border-l-4 border-accent pl-6 py-2 bg-white/[0.01]">
                     {data.resumo_dia}
                   </div>
@@ -1388,10 +1204,7 @@ const HomePanel = ({ config, setActivePanel, onError }: { config: BrandConfig, s
                    {data?.trends?.slice(0, 7).map((t, i) => (
                       <div key={i} className="flex items-center gap-[10px]">
                         <div className="font-syne text-[11px] font-bold text-muted flex-1 uppercase tracking-tight">{t.name}</div>
-                        <div className="w-[100px] h-[3px] bg-border overflow-hidden shrink-0">
-                          <div className="h-full bg-accent transition-all duration-700" style={{ width: `${t.score}%` }} />
-                        </div>
-                        <div className="font-mono text-[10px] text-accent font-bold w-[24px] text-right">{t.score}</div>
+                        <span className="text-sm text-muted">Sinal editorial</span>
                       </div>
                    ))}
                  </div>
@@ -1532,8 +1345,8 @@ const SettingsPanel = ({ config, setConfig }: { config: BrandConfig, setConfig: 
 // --- Chat Panel ---
 
 const ChatPanel = ({ config, onError }: { config: BrandConfig, onError: (e: any) => void }) => {
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', content: string }>>([
-    { role: 'assistant', content: "Olá! Sou o Oráculo da Kultur3 — especialista em inteligência cultural estratégica.\n\nTenho acesso à web em tempo real e ao seu contexto de marca. Me pergunte sobre **trends, territórios de marca, creators, momentos culturais** ou valide uma ideia de campanha." }
+  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant', content: string, research?: ResearchEvidence }>>([
+    { role: 'assistant', content: "Olá! Sou o Oráculo da Kultur3 — especialista em inteligência cultural estratégica.\n\nPosso pesquisar na web sob demanda e considerar seu contexto de marca. Me pergunte sobre **trends, territórios de marca, creators, momentos culturais** ou valide uma ideia de campanha." }
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -1555,8 +1368,8 @@ const ChatPanel = ({ config, onError }: { config: BrandConfig, onError: (e: any)
 Seu conhecimento é baseado em dados reais, sinais de redes sociais e pensamento lateral estratégico.
 Seja provocativa, direta e visual (use Markdown). MARCA: ${config.brand}, SEGMENTO: ${config.seg}.`;
       
-      const res = await generateContent(system, userMsg);
-      setMessages(prev => [...prev, { role: 'assistant', content: res }]);
+      const res = await generateTextResearch(system, userMsg, messages.slice(-10).map(m => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })));
+      setMessages(prev => [...prev, { role: 'assistant', content: res.text, research: res.research }]);
     } catch (e) {
       setMessages(prev => [...prev, { role: 'assistant', content: "Houve um lag no sinal neural. Tente novamente." }]);
       onError(e);
@@ -1593,6 +1406,7 @@ Seja provocativa, direta e visual (use Markdown). MARCA: ${config.brand}, SEGMEN
               </div>
               <div className={`flex-1 p-6 border ${m.role === 'assistant' ? 'bg-card border-border italic' : 'bg-transparent border-white/10'} text-[14px] text-white leading-relaxed font-light prose prose-invert max-w-none`}>
                 <Markdown>{m.content}</Markdown>
+                <ResearchSources evidence={m.research} />
               </div>
             </motion.div>
           ))}
@@ -1654,7 +1468,8 @@ export default function App() {
   };
 
   const [config, setConfig] = useState<BrandConfig>(() => {
-    const s = localStorage.getItem('k3_config');
+    let s: string | null = null;
+    try { s = localStorage.getItem('k3_config'); if (s) JSON.parse(s); } catch { s = null; }
     return s ? JSON.parse(s) : {
       brand: 'Geral',
       seg: 'Marketing & Cultura',
@@ -1691,7 +1506,7 @@ export default function App() {
             <div className="w-[1px] h-[16px] bg-border" />
             <div className="flex items-center gap-[5px] font-mono text-[8px] tracking-[1.5px] uppercase py-[3px] px-[9px] border border-pb text-accent bg-pd">
               <div className="w-[5px] h-[5px] rounded-full bg-accent animate-[blink_1.2s_infinite] shrink-0" />
-              AO VIVO
+              SOB DEMANDA
             </div>
             <div className="flex items-center gap-[5px] font-mono text-[8px] tracking-[1.5px] uppercase py-[3px] px-[9px] border border-border text-muted">
               Web Search
@@ -1808,7 +1623,7 @@ export default function App() {
                  {activePanel === 'onepager' && <OnePagerPanel config={config} onError={handleError} />}
                  {activePanel === 'rivals' && <RivalsPanel config={config} onError={handleError} />}
                  {activePanel === 'calendar' && <CalendarPanel onError={handleError} />}
-                 {activePanel === 'report' && <ReportPanel config={config} onError={handleError} />}
+                 {activePanel === 'report' && <CurationPanel config={config} />}
 
                  {activePanel === 'analytics' && <AnalyticsPanel config={config} activations={activations} setActivations={setActivations} reports={reports} />}
                  {activePanel === 'integrations' && <IntegrationsPanel />}
@@ -1837,4 +1652,3 @@ export default function App() {
     </div>
   );
 }
-
